@@ -181,13 +181,14 @@ body {
 
 .calibration-line {
     position: absolute;
-    top: 35%;
-    left: 20%;
-    width: 60%;
+    top: 25%;
+    left: 15%;
+    width: 70%;
     height: 4px;
     background: var(--success-color);
     transform: translateY(-50%);
     box-shadow: 0 0 10px var(--success-color);
+    z-index: 25;
 }
 
 .calibration-line::before,
@@ -213,9 +214,9 @@ body {
 
 .calibration-instructions {
     position: absolute;
-    top: 50%;
+    bottom: 100px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     text-align: center;
     padding: 20px;
     background: var(--overlay-bg);
