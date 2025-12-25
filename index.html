@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Speed Cam">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <title>Speed Camera</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Speed Camera</h1>
+            <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙️</button>
+        </header>
+
+        <!-- Main Camera View -->
+        <main class="camera-container">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+
+            <!-- Speed Display Overlay -->
+            <div class="speed-overlay">
+                <div class="speed-display">
+                    <span id="speedValue">0</span>
+                    <span class="speed-unit">MPH</span>
+                </div>
+                <div id="maxSpeed" class="max-speed">Max: 0 MPH</div>
+            </div>
+
+            <!-- Calibration Overlay -->
+            <div id="calibrationOverlay" class="calibration-overlay hidden">
+                <div class="calibration-line" id="calibrationLine"></div>
+                <div class="calibration-instructions">
+                    <p>Drag the line endpoints to match a known distance</p>
+                    <div class="calibration-input">
+                        <label for="knownDistance">Distance (feet):</label>
+                        <input type="number" id="knownDistance" value="12" min="1" max="100" step="0.5">
+                    </div>
+                    <button id="confirmCalibration" class="btn btn-primary">Confirm Calibration</button>
+                </div>
+            </div>
+
+            <!-- Detection Zone Indicator -->
+            <div id="detectionZone" class="detection-zone"></div>
+        </main>
+
+        <!-- Controls -->
+        <footer class="controls">
+            <button id="startBtn" class="btn btn-primary btn-large">Start Detection</button>
+            <button id="calibrateBtn" class="btn btn-secondary">Calibrate</button>
+            <button id="resetMaxBtn" class="btn btn-secondary">Reset Max</button>
+        </footer>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button id="closeSettings" class="icon-btn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-item">
+                        <label for="sensitivitySlider">Detection Sensitivity</label>
+                        <input type="range" id="sensitivitySlider" min="1" max="100" value="50">
+                        <span id="sensitivityValue">50</span>
+                    </div>
+                    <div class="setting-item">
+                        <label for="cameraSelect">Camera</label>
+                        <select id="cameraSelect">
+                            <option value="environment">Back Camera</option>
+                            <option value="user">Front Camera</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="minSpeedFilter">Minimum Speed (MPH)</label>
+                        <input type="number" id="minSpeedFilter" value="5" min="0" max="50">
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="soundAlert" checked>
+                            Sound Alert for High Speed
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="speedThreshold">Alert Threshold (MPH)</label>
+                        <input type="number" id="speedThreshold" value="25" min="5" max="100">
+                    </div>
+                    <div class="setting-item info">
+                        <h3>How to Use</h3>
+                        <ol>
+                            <li>Mount your phone in a stable position facing the road</li>
+                            <li>Tap "Calibrate" and set a known distance (e.g., lane width ~12ft)</li>
+                            <li>Tap "Start Detection" to begin measuring</li>
+                            <li>Moving objects will be tracked and speed estimated</li>
+                        </ol>
+                        <p class="disclaimer">⚠️ This is an estimation tool only. Not for official use.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading/Permission Screen -->
+        <div id="loadingScreen" class="loading-screen">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p id="loadingMessage">Initializing camera...</p>
+            </div>
+        </div>
+
+        <!-- Error Screen -->
+        <div id="errorScreen" class="error-screen hidden">
+            <div class="error-content">
+                <span class="error-icon">📷</span>
+                <h2>Camera Access Required</h2>
+                <p id="errorMessage">Please allow camera access to use this app.</p>
+                <button id="retryBtn" class="btn btn-primary">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="speed-detector.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

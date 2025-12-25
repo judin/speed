@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator - Speed Camera</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: white; }
+        .icons { display: flex; flex-wrap: wrap; gap: 20px; }
+        .icon-item { text-align: center; }
+        canvas { border: 1px solid #333; }
+        button { margin: 20px 0; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        a { color: #00d4ff; }
+    </style>
+</head>
+<body>
+    <h1>PWA Icon Generator</h1>
+    <p>Click each icon to download, or use the button below to download all.</p>
+
+    <div class="icons" id="icons"></div>
+
+    <button onclick="downloadAll()">Download All Icons</button>
+
+    <h2>Instructions</h2>
+    <p>Save these icons to the <code>icons/</code> folder with the filenames shown.</p>
+
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+
+        function drawIcon(ctx, size) {
+            const s = size;
+            const center = s / 2;
+            const radius = s * 0.35;
+
+            // Background gradient
+            const bgGrad = ctx.createLinearGradient(0, 0, s, s);
+            bgGrad.addColorStop(0, '#1a1a2e');
+            bgGrad.addColorStop(1, '#16213e');
+
+            // Accent gradient
+            const accentGrad = ctx.createLinearGradient(0, 0, s, s);
+            accentGrad.addColorStop(0, '#00d4ff');
+            accentGrad.addColorStop(1, '#7b2cbf');
+
+            // Draw rounded background
+            const cornerRadius = s * 0.2;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, s, s, cornerRadius);
+            ctx.fillStyle = bgGrad;
+            ctx.fill();
+
+            // Draw speedometer arc
+            ctx.beginPath();
+            ctx.arc(center, center + s * 0.1, radius, Math.PI * 1.1, Math.PI * -0.1);
+            ctx.strokeStyle = accentGrad;
+            ctx.lineWidth = s * 0.05;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw needle
+            ctx.save();
+            ctx.translate(center, center + s * 0.1);
+            ctx.rotate(Math.PI * 0.25);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -radius * 0.8);
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = s * 0.025;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Needle center
+            ctx.beginPath();
+            ctx.arc(0, 0, s * 0.04, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff4444';
+            ctx.fill();
+
+            ctx.restore();
+
+            // Draw MPH text
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = `bold ${s * 0.08}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('MPH', center, center + s * 0.3);
+        }
+
+        function createIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            drawIcon(ctx, size);
+
+            return canvas;
+        }
+
+        function downloadIcon(canvas, size) {
+            const link = document.createElement('a');
+            link.download = `icon-${size}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function init() {
+            const container = document.getElementById('icons');
+
+            sizes.forEach(size => {
+                const div = document.createElement('div');
+                div.className = 'icon-item';
+
+                const canvas = createIcon(size);
+                canvas.style.cursor = 'pointer';
+                canvas.onclick = () => downloadIcon(canvas, size);
+
+                const label = document.createElement('p');
+                label.textContent = `icon-${size}.png`;
+
+                div.appendChild(canvas);
+                div.appendChild(label);
+                container.appendChild(div);
+            });
+        }
+
+        function downloadAll() {
+            sizes.forEach((size, i) => {
+                setTimeout(() => {
+                    const canvas = createIcon(size);
+                    downloadIcon(canvas, size);
+                }, i * 200);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
