@@ -9,6 +9,7 @@ class SpeedCameraApp {
         this.canvas = document.getElementById('canvas');
         this.ctx = this.canvas.getContext('2d');
         this.speedValue = document.getElementById('speedValue');
+        this.speedDisplay = document.querySelector('.speed-display');
         this.maxSpeedDisplay = document.getElementById('maxSpeed');
 
         // Buttons
@@ -337,12 +338,15 @@ class SpeedCameraApp {
 
         // Remove existing classes
         this.speedValue.classList.remove('warning', 'danger');
+        this.speedDisplay.classList.remove('warning', 'danger');
 
         // Add appropriate class
         if (speed > threshold + 10) {
             this.speedValue.classList.add('danger');
+            this.speedDisplay.classList.add('danger');
         } else if (speed > threshold) {
             this.speedValue.classList.add('warning');
+            this.speedDisplay.classList.add('warning');
         }
     }
 
