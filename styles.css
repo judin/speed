@@ -181,7 +181,7 @@ body {
 
 .calibration-line {
     position: absolute;
-    top: 50%;
+    top: 35%;
     left: 20%;
     width: 60%;
     height: 4px;
@@ -213,9 +213,9 @@ body {
 
 .calibration-instructions {
     position: absolute;
-    bottom: 20%;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     text-align: center;
     padding: 20px;
     background: var(--overlay-bg);
@@ -223,6 +223,7 @@ body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     max-width: 90%;
+    width: 280px;
 }
 
 .calibration-instructions p {

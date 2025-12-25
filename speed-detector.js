@@ -8,7 +8,12 @@ class SpeedDetector {
         // Detection settings
         this.sensitivity = options.sensitivity || 50;
         this.minSpeedFilter = options.minSpeedFilter || 5;
-        this.frameRate = options.frameRate || 30;
+
+        // Frame rate measurement
+        this.frameRate = 30; // Will be measured dynamically
+        this.lastFrameTime = 0;
+        this.frameRateHistory = [];
+        this.frameRateHistorySize = 10;
 
         // Calibration (pixels per foot)
         this.pixelsPerFoot = options.pixelsPerFoot || null;
@@ -28,16 +33,23 @@ class SpeedDetector {
 
         // Detection zone (percentage of frame)
         this.detectionZone = {
-            x: 0.1,
-            y: 0.3,
-            width: 0.8,
-            height: 0.4
+            x: 0.05,
+            y: 0.2,
+            width: 0.9,
+            height: 0.6
         };
 
-        // Motion detection thresholds
-        this.motionThreshold = 25;
-        this.minBlobSize = 500; // minimum pixels for a valid object
-        this.maxBlobSize = 100000; // maximum pixels (to filter noise)
+        // Motion detection thresholds - lower = more sensitive
+        this.motionThreshold = 20;
+        this.minBlobSize = 100; // minimum pixels for a valid object
+        this.maxBlobSize = 200000; // maximum pixels (to filter noise)
+
+        // Debug stats
+        this.debugStats = {
+            motionPixels: 0,
+            blobsFound: 0,
+            trackedCount: 0
+        };
     }
 
     /**
@@ -143,7 +155,21 @@ class SpeedDetector {
      * @returns {Object} Detection results
      */
     processFrame(video, outputCtx) {
-        if (!this.processingCtx) return { speed: 0, objects: [] };
+        if (!this.processingCtx) return { speed: 0, objects: [], debug: this.debugStats };
+
+        // Measure actual frame rate
+        const now = performance.now();
+        if (this.lastFrameTime > 0) {
+            const deltaMs = now - this.lastFrameTime;
+            const instantFps = 1000 / deltaMs;
+            this.frameRateHistory.push(instantFps);
+            if (this.frameRateHistory.length > this.frameRateHistorySize) {
+                this.frameRateHistory.shift();
+            }
+            // Use average FPS
+            this.frameRate = this.frameRateHistory.reduce((a, b) => a + b, 0) / this.frameRateHistory.length;
+        }
+        this.lastFrameTime = now;
 
         // Draw current frame to processing canvas (scaled down for performance)
         this.processingCtx.drawImage(video, 0, 0, this.width, this.height);
@@ -155,7 +181,7 @@ class SpeedDetector {
         if (!this.prevFrame) {
             this.prevFrame = currentFrame;
             this.prevCtx.putImageData(currentFrame, 0, 0);
-            return { speed: 0, objects: [] };
+            return { speed: 0, objects: [], debug: this.debugStats };
         }
 
         // Compute frame difference
@@ -163,9 +189,11 @@ class SpeedDetector {
 
         // Find motion blobs
         const blobs = this.findMotionBlobs(diffData);
+        this.debugStats.blobsFound = blobs.length;
 
         // Track objects and calculate speed
         const trackedObjects = this.trackObjects(blobs);
+        this.debugStats.trackedCount = trackedObjects.length;
 
         // Calculate average speed from tracked objects
         let maxObjectSpeed = 0;
@@ -200,7 +228,12 @@ class SpeedDetector {
         return {
             speed: Math.round(this.currentSpeed),
             maxSpeed: Math.round(this.maxSpeed),
-            objects: trackedObjects
+            objects: trackedObjects,
+            debug: {
+                ...this.debugStats,
+                fps: Math.round(this.frameRate),
+                pixelsPerFoot: Math.round(this.pixelsPerFoot || 0)
+            }
         };
     }
 
@@ -212,6 +245,7 @@ class SpeedDetector {
         const prev = prevFrame.data;
         const curr = currentFrame.data;
         const out = diff.data;
+        let motionPixelCount = 0;
 
         // Detection zone boundaries
         const zoneX1 = Math.floor(this.width * this.detectionZone.x);
@@ -238,6 +272,7 @@ class SpeedDetector {
                 // Threshold
                 if (diff_val > this.motionThreshold) {
                     out[i] = out[i + 1] = out[i + 2] = 255;
+                    motionPixelCount++;
                 } else {
                     out[i] = out[i + 1] = out[i + 2] = 0;
                 }
@@ -245,6 +280,7 @@ class SpeedDetector {
             }
         }
 
+        this.debugStats.motionPixels = motionPixelCount;
         this.diffCtx.putImageData(diff, 0, 0);
         return diff;
     }
@@ -403,35 +439,46 @@ class SpeedDetector {
         );
         ctx.setLineDash([]);
 
-        // Draw tracked objects
-        objects.forEach(obj => {
-            if (obj.frames < 2) return; // Skip new objects
+        // Draw debug info in corner
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 10, 160, 80);
+        ctx.fillStyle = '#00d4ff';
+        ctx.font = '12px monospace';
+        ctx.fillText(`FPS: ${Math.round(this.frameRate)}`, 20, 28);
+        ctx.fillText(`Motion: ${this.debugStats.motionPixels}px`, 20, 44);
+        ctx.fillText(`Blobs: ${this.debugStats.blobsFound}`, 20, 60);
+        ctx.fillText(`Tracked: ${objects.length}`, 20, 76);
 
-            // Bounding box color based on speed
-            let color = 'rgba(0, 212, 255, 0.8)';
-            if (obj.speed > 35) {
-                color = 'rgba(255, 68, 68, 0.8)';
-            } else if (obj.speed > 25) {
-                color = 'rgba(255, 170, 0, 0.8)';
+        // Draw tracked objects - show ALL detected blobs
+        objects.forEach(obj => {
+            // Color based on tracking state and speed
+            let color = 'rgba(0, 255, 136, 0.6)'; // Green for new/untracked
+            if (obj.frames >= 2) {
+                color = 'rgba(0, 212, 255, 0.8)'; // Cyan for tracked
+                if (obj.speed > 35) {
+                    color = 'rgba(255, 68, 68, 0.8)'; // Red for fast
+                } else if (obj.speed > 25) {
+                    color = 'rgba(255, 170, 0, 0.8)'; // Orange for medium
+                }
             }
 
             ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
 
-            // Speed label
-            if (obj.speed > this.minSpeedFilter) {
+            // Show speed label for tracked objects
+            if (obj.frames >= 2 && obj.speed > 0) {
                 ctx.fillStyle = color;
-                ctx.font = 'bold 16px sans-serif';
+                ctx.font = 'bold 14px sans-serif';
                 ctx.fillText(
                     `${Math.round(obj.speed)} MPH`,
                     obj.x,
-                    obj.y - 8
+                    obj.y - 6
                 );
 
                 // Motion direction arrow
-                if (Math.abs(obj.dx) > 5 || Math.abs(obj.dy) > 5) {
-                    const arrowLen = 30;
+                if (Math.abs(obj.dx) > 3 || Math.abs(obj.dy) > 3) {
+                    const arrowLen = Math.min(40, Math.sqrt(obj.dx * obj.dx + obj.dy * obj.dy) * 2);
                     const angle = Math.atan2(obj.dy, obj.dx);
                     const endX = obj.centerX + Math.cos(angle) * arrowLen;
                     const endY = obj.centerY + Math.sin(angle) * arrowLen;
@@ -442,6 +489,12 @@ class SpeedDetector {
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 2;
                     ctx.stroke();
+
+                    // Arrow head
+                    ctx.beginPath();
+                    ctx.arc(endX, endY, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
                 }
             }
         });
@@ -455,6 +508,8 @@ class SpeedDetector {
         this.currentSpeed = 0;
         this.speedHistory = [];
         this.prevFrame = null;
+        this.lastFrameTime = 0;
+        this.frameRateHistory = [];
     }
 
     /**
