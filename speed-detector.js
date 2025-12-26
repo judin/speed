@@ -33,10 +33,10 @@ class SpeedDetector {
 
         // Detection zone (percentage of frame)
         this.detectionZone = {
-            x: 0.05,
-            y: 0.2,
-            width: 0.9,
-            height: 0.6
+            x: 0.02,
+            y: 0.02,
+            width: 0.96,
+            height: 0.96
         };
 
         // Motion detection thresholds - lower = more sensitive
