@@ -39,12 +39,19 @@
             <div id="calibrationOverlay" class="calibration-overlay hidden">
                 <div class="calibration-line" id="calibrationLine"></div>
                 <div class="calibration-instructions">
-                    <p>Drag the line endpoints to match a known distance</p>
+                    <h3>How to calibrate</h3>
+                    <ol>
+                        <li>Find something in view with a known width (e.g. a car is ~6ft wide, a lane is ~12ft)</li>
+                        <li>Drag the green dots to match that object's width</li>
+                        <li>Enter the real-world size below</li>
+                    </ol>
                     <div class="calibration-input">
-                        <label for="knownDistance">Distance (feet):</label>
+                        <label for="knownDistance">That distance is:</label>
                         <input type="number" id="knownDistance" value="12" min="1" max="100" step="0.5">
+                        <span class="unit-label">feet</span>
                     </div>
-                    <button id="confirmCalibration" class="btn btn-primary">Confirm Calibration</button>
+                    <button id="confirmCalibration" class="btn btn-primary">Done</button>
+                    <p class="calibration-tip">Tip: Skip this step to use auto-calibration (assumes 12ft lane width)</p>
                 </div>
             </div>
 

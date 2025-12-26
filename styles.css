@@ -231,22 +231,55 @@ body {
 
 .calibration-instructions {
     position: absolute;
-    bottom: 100px;
+    bottom: 80px;
     left: 50%;
     transform: translateX(-50%);
-    text-align: center;
+    text-align: left;
     padding: 20px;
     background: var(--overlay-bg);
     border-radius: 16px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     max-width: 90%;
-    width: 280px;
+    width: 300px;
+}
+
+.calibration-instructions h3 {
+    text-align: center;
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.calibration-instructions ol {
+    margin: 0 0 16px 0;
+    padding-left: 20px;
+}
+
+.calibration-instructions li {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    line-height: 1.4;
 }
 
 .calibration-instructions p {
     margin-bottom: 16px;
     color: var(--text-secondary);
+}
+
+.calibration-tip {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 12px;
+    margin-bottom: 0 !important;
+    opacity: 0.7;
+}
+
+.unit-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .calibration-input {
