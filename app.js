@@ -61,6 +61,13 @@ class SpeedCameraApp {
         this.calibrationLineStart = 0.2;
         this.calibrationLineEnd = 0.8;
 
+        // Device stability detection
+        this.isStable = true;
+        this.motionHistory = [];
+        this.motionHistorySize = 10;
+        this.stabilityThreshold = 1.5; // m/s² - lower = more strict
+        this.hasMotionPermission = false;
+
         // Initialize
         this.init();
     }
@@ -69,7 +76,85 @@ class SpeedCameraApp {
         this.loadSettings();
         this.bindEvents();
         await this.setupCamera();
+        await this.setupMotionDetection();
         this.registerServiceWorker();
+    }
+
+    /**
+     * Setup device motion detection for stability
+     */
+    async setupMotionDetection() {
+        // Check if DeviceMotion is available
+        if (!window.DeviceMotionEvent) {
+            console.log('DeviceMotion not supported');
+            return;
+        }
+
+        // iOS 13+ requires permission
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            try {
+                const permission = await DeviceMotionEvent.requestPermission();
+                if (permission === 'granted') {
+                    this.hasMotionPermission = true;
+                    this.startMotionListening();
+                }
+            } catch (e) {
+                console.log('Motion permission denied:', e);
+            }
+        } else {
+            // Non-iOS or older iOS
+            this.hasMotionPermission = true;
+            this.startMotionListening();
+        }
+    }
+
+    /**
+     * Start listening to device motion events
+     */
+    startMotionListening() {
+        window.addEventListener('devicemotion', (event) => {
+            const acc = event.accelerationIncludingGravity;
+            if (!acc) return;
+
+            // Calculate total acceleration magnitude (excluding gravity baseline of ~9.8)
+            const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+            const deviation = Math.abs(magnitude - 9.8); // Deviation from stationary
+
+            this.motionHistory.push(deviation);
+            if (this.motionHistory.length > this.motionHistorySize) {
+                this.motionHistory.shift();
+            }
+
+            // Calculate average motion
+            const avgMotion = this.motionHistory.reduce((a, b) => a + b, 0) / this.motionHistory.length;
+
+            // Update stability state
+            const wasStable = this.isStable;
+            this.isStable = avgMotion < this.stabilityThreshold;
+
+            // Update UI if changed
+            if (wasStable !== this.isStable) {
+                this.updateStabilityIndicator();
+            }
+        }, { passive: true });
+
+        console.log('Motion detection active');
+    }
+
+    /**
+     * Update stability indicator in UI
+     */
+    updateStabilityIndicator() {
+        const indicator = document.getElementById('stabilityIndicator');
+        if (indicator) {
+            if (this.isStable) {
+                indicator.classList.remove('unstable');
+                indicator.textContent = 'Stable';
+            } else {
+                indicator.classList.add('unstable');
+                indicator.textContent = 'Hold Steady';
+            }
+        }
     }
 
     /**
@@ -312,16 +397,23 @@ class SpeedCameraApp {
     detectLoop() {
         if (!this.isRunning) return;
 
-        // Process frame
-        const result = this.detector.processFrame(this.video, this.ctx);
+        // Process frame with stability info
+        const result = this.detector.processFrame(this.video, this.ctx, this.isStable);
 
-        // Update display
-        this.updateSpeedDisplay(result.speed);
+        // Only update speed if stable (or if no motion detection available)
+        if (this.isStable || !this.hasMotionPermission) {
+            this.updateSpeedDisplay(result.speed);
 
-        // Check for alert
-        if (result.speed > 0) {
-            this.maxSpeedDisplay.textContent = `Max: ${result.maxSpeed} MPH`;
-            this.checkSpeedAlert(result.speed);
+            // Check for alert
+            if (result.speed > 0) {
+                this.maxSpeedDisplay.textContent = `Max: ${result.maxSpeed} MPH`;
+                this.checkSpeedAlert(result.speed);
+            }
+        } else {
+            // Show dash when unstable
+            this.speedValue.textContent = '--';
+            this.speedValue.classList.remove('warning', 'danger');
+            this.speedDisplay.classList.remove('warning', 'danger');
         }
 
         // Continue loop

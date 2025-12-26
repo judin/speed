@@ -159,6 +159,31 @@ body {
     -webkit-backdrop-filter: blur(10px);
 }
 
+.stability-indicator {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--success-color);
+    background: rgba(0, 255, 136, 0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--success-color);
+    transition: all 0.3s ease;
+}
+
+.stability-indicator.unstable {
+    color: var(--warning-color);
+    background: rgba(255, 170, 0, 0.2);
+    border-color: var(--warning-color);
+    animation: shake 0.5s infinite;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
 /* Detection Zone */
 .detection-zone {
     position: absolute;

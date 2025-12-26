@@ -152,10 +152,13 @@ class SpeedDetector {
      * Process a video frame and detect speed
      * @param {HTMLVideoElement} video - Source video element
      * @param {CanvasRenderingContext2D} outputCtx - Canvas for drawing overlays
+     * @param {boolean} isStable - Whether device is stable
      * @returns {Object} Detection results
      */
-    processFrame(video, outputCtx) {
+    processFrame(video, outputCtx, isStable = true) {
         if (!this.processingCtx) return { speed: 0, objects: [], debug: this.debugStats };
+
+        this.isStable = isStable;
 
         // Measure actual frame rate
         const now = performance.now();
@@ -360,6 +363,7 @@ class SpeedDetector {
 
     /**
      * Track objects between frames and calculate speed
+     * Uses velocity prediction for better matching
      */
     trackObjects(blobs) {
         const newTracked = [];
@@ -368,34 +372,54 @@ class SpeedDetector {
         // Filter blobs to vehicle-like objects (wider than tall, minimum size)
         const vehicleBlobs = blobs.filter(blob => {
             const aspectRatio = blob.width / Math.max(blob.height, 1);
-            const minSize = 500; // Minimum pixel area for a vehicle
-            const isWideEnough = aspectRatio > 0.5; // Vehicles are usually wider than tall
+            const minSize = 400; // Minimum pixel area for a vehicle
+            const isWideEnough = aspectRatio > 0.4; // Vehicles are usually wider than tall
             const isBigEnough = blob.size >= minSize;
             return isWideEnough && isBigEnough;
         });
 
         for (const blob of vehicleBlobs) {
-            // Find closest previous object
+            // Find best matching previous object using prediction
             let bestMatch = null;
-            let bestDist = Infinity;
+            let bestScore = Infinity;
 
             for (let i = 0; i < this.trackedObjects.length; i++) {
                 if (usedPrev.has(i)) continue;
 
                 const prev = this.trackedObjects[i];
-                const dx = blob.centerX - prev.centerX;
-                const dy = blob.centerY - prev.centerY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
 
-                // More lenient matching for fast-moving vehicles
-                // Allow up to 300px movement between frames (fast cars)
+                // Predict where object should be based on previous velocity
+                const predictedX = prev.centerX + (prev.dx || 0);
+                const predictedY = prev.centerY + (prev.dy || 0);
+
+                // Distance from actual position to predicted position
+                const predDx = blob.centerX - predictedX;
+                const predDy = blob.centerY - predictedY;
+                const predDist = Math.sqrt(predDx * predDx + predDy * predDy);
+
+                // Also consider raw distance for new/slow objects
+                const rawDx = blob.centerX - prev.centerX;
+                const rawDy = blob.centerY - prev.centerY;
+                const rawDist = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
+
+                // Use the smaller distance (prediction helps for tracked objects)
+                const dist = prev.frames > 2 ? Math.min(predDist, rawDist) : rawDist;
+
+                // Size similarity score
                 const sizeRatio = blob.size / Math.max(prev.size, 1);
-                const isCloseEnough = dist < 300;
-                const isSimilarSize = sizeRatio > 0.3 && sizeRatio < 3.0;
+                const sizePenalty = Math.abs(1 - sizeRatio) * 50;
 
-                if (isCloseEnough && isSimilarSize && dist < bestDist) {
-                    bestDist = dist;
-                    bestMatch = { index: i, prev, dx, dy, dist };
+                // Combined score (lower is better)
+                const score = dist + sizePenalty;
+
+                // Match criteria
+                const maxDist = prev.frames > 2 ? 400 : 300; // Allow more for tracked objects
+                const isCloseEnough = dist < maxDist;
+                const isSimilarSize = sizeRatio > 0.25 && sizeRatio < 4.0;
+
+                if (isCloseEnough && isSimilarSize && score < bestScore) {
+                    bestScore = score;
+                    bestMatch = { index: i, prev, dx: rawDx, dy: rawDy, dist: rawDist };
                 }
             }
 
@@ -467,17 +491,22 @@ class SpeedDetector {
 
         // Draw debug info in corner
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 180, 95);
-        ctx.fillStyle = '#00d4ff';
+        ctx.fillRect(10, 10, 190, 110);
         ctx.font = '12px monospace';
-        ctx.fillText(`FPS: ${Math.round(this.frameRate)}`, 20, 28);
-        ctx.fillText(`Motion: ${this.debugStats.motionPixels}px`, 20, 44);
-        ctx.fillText(`Vehicles: ${objects.length}`, 20, 60);
+
+        // Stability indicator
+        ctx.fillStyle = this.isStable ? '#00ff88' : '#ffaa00';
+        ctx.fillText(`${this.isStable ? '● Stable' : '○ Moving'}`, 20, 28);
+
+        ctx.fillStyle = '#00d4ff';
+        ctx.fillText(`FPS: ${Math.round(this.frameRate)}`, 110, 28);
+        ctx.fillText(`Motion: ${this.debugStats.motionPixels}px`, 20, 46);
+        ctx.fillText(`Vehicles: ${objects.length}`, 20, 64);
 
         // Show speeds of tracked objects
         const speeds = objects.filter(o => o.frames >= 2 && o.speed > 0).map(o => Math.round(o.speed));
-        ctx.fillText(`Speeds: ${speeds.length > 0 ? speeds.join(', ') : 'none'}`, 20, 76);
-        ctx.fillText(`Cal: ${Math.round(this.pixelsPerFoot || 0)} px/ft`, 20, 92);
+        ctx.fillText(`Speeds: ${speeds.length > 0 ? speeds.join(', ') : 'none'}`, 20, 82);
+        ctx.fillText(`Cal: ${Math.round(this.pixelsPerFoot || 0)} px/ft`, 20, 100);
 
         // Draw tracked objects - show ALL detected blobs
         objects.forEach(obj => {
