@@ -7,7 +7,7 @@ class SpeedDetector {
     constructor(options = {}) {
         // Detection settings
         this.sensitivity = options.sensitivity || 50;
-        this.minSpeedFilter = options.minSpeedFilter || 5;
+        this.minSpeedFilter = options.minSpeedFilter || 0; // Show all speeds for debugging
 
         // Frame rate measurement
         this.frameRate = 30; // Will be measured dynamically
@@ -365,7 +365,16 @@ class SpeedDetector {
         const newTracked = [];
         const usedPrev = new Set();
 
-        for (const blob of blobs) {
+        // Filter blobs to vehicle-like objects (wider than tall, minimum size)
+        const vehicleBlobs = blobs.filter(blob => {
+            const aspectRatio = blob.width / Math.max(blob.height, 1);
+            const minSize = 500; // Minimum pixel area for a vehicle
+            const isWideEnough = aspectRatio > 0.5; // Vehicles are usually wider than tall
+            const isBigEnough = blob.size >= minSize;
+            return isWideEnough && isBigEnough;
+        });
+
+        for (const blob of vehicleBlobs) {
             // Find closest previous object
             let bestMatch = null;
             let bestDist = Infinity;
@@ -378,9 +387,13 @@ class SpeedDetector {
                 const dy = blob.centerY - prev.centerY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                // Match if close enough and similar size
-                const sizeRatio = blob.size / prev.size;
-                if (dist < 150 && sizeRatio > 0.5 && sizeRatio < 2.0 && dist < bestDist) {
+                // More lenient matching for fast-moving vehicles
+                // Allow up to 300px movement between frames (fast cars)
+                const sizeRatio = blob.size / Math.max(prev.size, 1);
+                const isCloseEnough = dist < 300;
+                const isSimilarSize = sizeRatio > 0.3 && sizeRatio < 3.0;
+
+                if (isCloseEnough && isSimilarSize && dist < bestDist) {
                     bestDist = dist;
                     bestMatch = { index: i, prev, dx, dy, dist };
                 }
@@ -390,16 +403,29 @@ class SpeedDetector {
                 usedPrev.add(bestMatch.index);
 
                 // Calculate speed in MPH
-                const pixelsPerSecond = bestMatch.dist * this.frameRate;
-                const feetPerSecond = this.pixelsPerFoot ?
-                    pixelsPerSecond / this.pixelsPerFoot :
-                    pixelsPerSecond / 50; // fallback rough estimate
-                const mph = feetPerSecond * 0.681818; // ft/s to mph
+                // dist = pixels moved per frame
+                // frameRate = frames per second
+                // pixelsPerFoot = calibration (pixels per real-world foot)
+                const pixelsMoved = bestMatch.dist;
+                const pixelsPerSecond = pixelsMoved * this.frameRate;
+
+                // Convert to feet per second
+                const calibration = this.pixelsPerFoot || (this.width * 0.6 / 12); // default: 60% of screen = 12ft
+                const feetPerSecond = pixelsPerSecond / calibration;
+
+                // Convert to MPH (1 ft/s = 0.681818 mph)
+                const mph = feetPerSecond * 0.681818;
+
+                // Only count if mostly horizontal movement (vehicles on road)
+                const horizontalRatio = Math.abs(bestMatch.dx) / Math.max(Math.abs(bestMatch.dy), 1);
+                const isHorizontalMovement = horizontalRatio > 0.5;
+
+                const calculatedSpeed = isHorizontalMovement ? Math.abs(mph) : 0;
 
                 newTracked.push({
                     ...blob,
                     id: bestMatch.prev.id,
-                    speed: Math.abs(mph),
+                    speed: calculatedSpeed,
                     dx: bestMatch.dx,
                     dy: bestMatch.dy,
                     frames: bestMatch.prev.frames + 1
@@ -441,13 +467,17 @@ class SpeedDetector {
 
         // Draw debug info in corner
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 160, 80);
+        ctx.fillRect(10, 10, 180, 95);
         ctx.fillStyle = '#00d4ff';
         ctx.font = '12px monospace';
         ctx.fillText(`FPS: ${Math.round(this.frameRate)}`, 20, 28);
         ctx.fillText(`Motion: ${this.debugStats.motionPixels}px`, 20, 44);
-        ctx.fillText(`Blobs: ${this.debugStats.blobsFound}`, 20, 60);
-        ctx.fillText(`Tracked: ${objects.length}`, 20, 76);
+        ctx.fillText(`Vehicles: ${objects.length}`, 20, 60);
+
+        // Show speeds of tracked objects
+        const speeds = objects.filter(o => o.frames >= 2 && o.speed > 0).map(o => Math.round(o.speed));
+        ctx.fillText(`Speeds: ${speeds.length > 0 ? speeds.join(', ') : 'none'}`, 20, 76);
+        ctx.fillText(`Cal: ${Math.round(this.pixelsPerFoot || 0)} px/ft`, 20, 92);
 
         // Draw tracked objects - show ALL detected blobs
         objects.forEach(obj => {
