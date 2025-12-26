@@ -3,15 +3,15 @@
  * Provides offline functionality and caching
  */
 
-const CACHE_NAME = 'speed-camera-v1';
+const CACHE_NAME = 'speed-camera-v2';
 const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/speed-detector.js',
-    '/manifest.json',
-    '/icons/icon.svg'
+    './',
+    './index.html',
+    './styles.css',
+    './app.js',
+    './speed-detector.js',
+    './manifest.json',
+    './icons/icon.svg'
 ];
 
 // Install event - cache assets
@@ -100,7 +100,7 @@ self.addEventListener('fetch', (event) => {
 
                         // For navigation requests, return cached index
                         if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
+                            return caches.match('./index.html');
                         }
 
                         return new Response('Offline', {
